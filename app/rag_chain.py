@@ -1,15 +1,17 @@
 import os
 
 from dotenv import load_dotenv
-from langchain_classic.chains import RetrievalQA
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 load_dotenv()
 
-QA_PROMPT_TEMPLATE = """Use the following pieces of context to answer the question.
+QA_PROMPT = ChatPromptTemplate.from_template(
+    """Use the following pieces of context to answer the question.
 If you cannot find a direct answer in the context, provide the most relevant
 information available. Be concise and specific.
 
@@ -19,10 +21,6 @@ Context:
 Question: {question}
 
 Answer:"""
-
-QA_PROMPT = PromptTemplate(
-    template=QA_PROMPT_TEMPLATE,
-    input_variables=["context", "question"],
 )
 
 
@@ -39,8 +37,13 @@ def create_vector_store(documents: list[Document]) -> Chroma:
     return vector_store
 
 
-def create_qa_chain(vector_store: Chroma) -> RetrievalQA:
-    """Create a RetrievalQA chain with the vector store."""
+def _format_docs(docs: list[Document]) -> str:
+    """Format retrieved documents into a single string."""
+    return "\n\n".join(doc.page_content for doc in docs)
+
+
+def create_qa_chain(vector_store: Chroma):
+    """Create a RAG chain using LCEL (LangChain Expression Language)."""
     llm = ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0,
@@ -50,23 +53,24 @@ def create_qa_chain(vector_store: Chroma) -> RetrievalQA:
         search_type="similarity",
         search_kwargs={"k": 6},
     )
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        return_source_documents=False,
-        chain_type_kwargs={"prompt": QA_PROMPT},
+
+    # LCEL chain: retrieve → format → prompt → llm → parse
+    rag_chain = (
+        {"context": retriever | _format_docs, "question": RunnablePassthrough()}
+        | QA_PROMPT
+        | llm
+        | StrOutputParser()
     )
-    return qa_chain
+    return rag_chain
 
 
 async def answer_questions(
-    qa_chain: RetrievalQA,
+    rag_chain,
     questions: list[str],
 ) -> dict[str, str]:
-    """Answer a list of questions using the QA chain."""
+    """Answer a list of questions using the RAG chain."""
     answers = {}
     for question in questions:
-        result = await qa_chain.ainvoke({"query": question})
-        answers[question] = result.get("result", "Unable to find answer")
+        answer = await rag_chain.ainvoke(question)
+        answers[question] = answer
     return answers
