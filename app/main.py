@@ -18,7 +18,6 @@ from app.schemas import (
     ChatResponse,
     HistoryResponse,
     MessageOut,
-    QAResponse,
 )
 
 app = FastAPI(title="Zania Q&A API")
@@ -80,16 +79,16 @@ async def get_history(session_id: str):
         )
 
 
-@app.post("/qa", response_model=QAResponse)
+@app.post("/qa")
 async def process_qa(
     questions_file: UploadFile,
     document_file: UploadFile,
-):
+) -> dict[str, str]:
     """
     Process Q&A request.
 
-    Upload a questions file (JSON or CSV) and a document file (PDF or JSON).
-    Returns answers for each question based on the document content.
+    Upload a questions file (JSON) and a document file (PDF or JSON).
+    Returns JSON pairing each question with its answer.
     """
     questions_suffix = os.path.splitext(questions_file.filename or "")[1]
     document_suffix = os.path.splitext(document_file.filename or "")[1]
@@ -113,7 +112,7 @@ async def process_qa(
         qa_chain = create_qa_chain(vector_store)
         answers = await answer_questions(qa_chain, questions)
 
-        return QAResponse(answers=answers)
+        return answers  # Direct dict: {"question": "answer", ...}
 
     finally:
         if os.path.exists(questions_path):
