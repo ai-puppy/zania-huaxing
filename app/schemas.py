@@ -21,3 +21,7 @@ class MessageOut(BaseModel):
 class HistoryResponse(BaseModel):
     session_id: str
     messages: list[MessageOut]
+
+
+class QAResponse(BaseModel):
+    answers: dict[str, str]
