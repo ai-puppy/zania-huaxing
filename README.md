@@ -91,6 +91,16 @@ The `example_input/` directory contains sample files:
 
 ## Development
 
+### Pre-commit Hooks
+
+Install and set up pre-commit hooks to ensure code quality before commits:
+
+```bash
+uv run pre-commit install
+```
+
+This will run linting and formatting checks automatically on each commit.
+
 ### Code Quality
 
 The project uses ruff for linting and formatting:

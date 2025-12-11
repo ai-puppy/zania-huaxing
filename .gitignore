@@ -12,4 +12,3 @@ wheels/
 .env
 
 .playwright-mcp
-example_input
